@@ -2619,6 +2619,25 @@ void IoTHubTransport_MQTT_Common_Unsubscribe_DeviceTwin(IOTHUB_DEVICE_HANDLE han
     }
 }
 
+IOTHUB_CLIENT_RESULT IoTHubTransport_MQTT_Common_GetDeviceTwinAsync(IOTHUB_DEVICE_HANDLE handle, IOTHUB_CLIENT_DEVICE_TWIN_CALLBACK completionCallback, void* callbackContext)
+{
+    IOTHUB_CLIENT_RESULT result;
+
+    if (handle == NULL || completionCallback == NULL)
+    {
+        LogError("Invalid argument (handle=%p, completionCallback=%p)", handle, completionCallback);
+        result = IOTHUB_CLIENT_INVALID_ARG;
+    }
+    else
+    {
+        // TODO: continue this.
+        (void)callbackContext;
+        result = IOTHUB_CLIENT_OK;
+    }
+
+    return result;
+}
+
 int IoTHubTransport_MQTT_Common_Subscribe_DeviceMethod(IOTHUB_DEVICE_HANDLE handle)
 {
     int result;

@@ -70,6 +70,12 @@ typedef struct DEVICE_SEND_TWIN_UPDATE_CONTEXT_TAG
     void* context;
 } DEVICE_SEND_TWIN_UPDATE_CONTEXT;
 
+typedef struct DEVICE_GET_TWIN_CONTEXT_TAG
+{
+    DEVICE_TWIN_UPDATE_RECEIVED_CALLBACK on_get_twin_completed_callback;
+    void* context;
+} DEVICE_GET_TWIN_CONTEXT;
+
 // Internal state control
 static void update_state(AMQP_DEVICE_INSTANCE* instance, DEVICE_STATE new_state)
 {
@@ -317,6 +323,24 @@ static void on_twin_messenger_state_changed_callback(void* context, TWIN_MESSENG
     }
 }
 
+static void on_get_twin_completed(TWIN_UPDATE_TYPE update_type, const char* payload, size_t size, const void* context)
+{
+    (void)update_type;
+
+    if (payload == NULL || context == NULL)
+    {
+        LogError("Invalid argument (context=%p, payload=%p)", context, payload);
+    }
+    else
+    {
+        DEVICE_GET_TWIN_CONTEXT* twin_ctx = (DEVICE_GET_TWIN_CONTEXT*)context;
+
+        // get-twin-async always returns a complete twin json.
+        twin_ctx->on_get_twin_completed_callback(DEVICE_TWIN_UPDATE_TYPE_COMPLETE, (const unsigned char*)payload, size, twin_ctx->context);
+
+        free(twin_ctx);
+    }
+}
 
 //---------- Message Dispostion ----------//
 
@@ -1663,6 +1687,46 @@ int device_unsubscribe_for_twin_updates(AMQP_DEVICE_HANDLE handle)
             instance->on_device_twin_update_received_context = NULL;
             // Codes_SRS_DEVICE_09_150: [If no failures occur, device_unsubscribe_for_twin_updates shall return 0]
             result = RESULT_OK;
+        }
+    }
+
+    return result;
+}
+
+int device_get_twin_async(AMQP_DEVICE_HANDLE handle, DEVICE_TWIN_UPDATE_RECEIVED_CALLBACK on_device_get_twin_completed_callback, void* context)
+{
+    int result;
+
+    if (handle == NULL || on_device_get_twin_completed_callback == NULL)
+    {
+        LogError("Invalid argument (handle=%p, on_device_get_twin_completed_callback=%p)", handle, on_device_get_twin_completed_callback);
+        result = __FAILURE__;
+    }
+    else
+    {
+        AMQP_DEVICE_INSTANCE* instance = (AMQP_DEVICE_INSTANCE*)handle;
+        DEVICE_GET_TWIN_CONTEXT* twin_ctx;
+
+        if ((twin_ctx = (DEVICE_GET_TWIN_CONTEXT*)malloc(sizeof(DEVICE_GET_TWIN_CONTEXT))) == NULL)
+        {
+            LogError("Cannot get device twin (failed creating TWIN context)");
+            result = __FAILURE__;
+        }
+        else
+        {
+            twin_ctx->on_get_twin_completed_callback = on_device_get_twin_completed_callback;
+            twin_ctx->context = context;
+
+            if (twin_messenger_get_twin_async(instance->twin_messenger_handle, on_get_twin_completed, twin_ctx) != 0)
+            {
+                LogError("Failed getting device twin");
+                free(twin_ctx);
+                result = __FAILURE__;
+            }
+            else
+            {
+                result = RESULT_OK;
+            }
         }
     }
 
